@@ -1,0 +1,15 @@
+/.bundle/
+/.yardoc
+/Gemfile.lock
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+!/tmp/.gitkeep
+/tags
+tags
+.byebug_history
+.elements/
+/notes
