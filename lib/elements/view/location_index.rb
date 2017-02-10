@@ -58,7 +58,7 @@ module Elements
         start_column = @column
 
         # ok this is a correct way to get the line count
-        line_count = matched.count("\r?\n")
+        line_count = matched.count("\n")
         @line += line_count
 
         if line_count > 0
