@@ -1,5 +1,3 @@
-# XXX support svg and mathml and namespaces and namespacing elements in general.
-
 require "set"
 
 module Elements
@@ -68,13 +66,6 @@ module Elements
       end
 
       # Void tags close themselves automatically.
-      # XXX It's not clear whether we should raise an error if you try to close
-      # a tag that doesn't need closing. Alternatively, we could just throw away
-      # a closing tag that is for a void tag since we know that we won't find
-      # the start tag on the stack. We could warn the user too. But this seems
-      # like one of those things that super annoying. the user would be like wtf
-      # why are you making me think about this stupid language so much. so make
-      # this easy for them.
       def void_tag?(tag)
         VOID_TAGS.include?(tag)
       end

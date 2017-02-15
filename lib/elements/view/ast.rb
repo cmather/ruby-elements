@@ -1,5 +1,3 @@
-# XXX design: make "body" "children" for consistency. it's weird to have to
-# remember both isn't it? or maybe not.
 require "elements/view/location"
 require "elements/view/assertions"
 

@@ -33,7 +33,6 @@ module Elements
 
       alias_method :parse, :parse_document
 
-      # XXX is there a way to make this return an array?
       def parse_document_body
         case @lexer.lookahead.type
         when :ANY
@@ -70,9 +69,6 @@ module Elements
           # match the close of the open template tag <template ... >
           match(:CLOSE_CARET)
 
-          # XXX can we put the loop into the parse_template body?
-          # parse the template body parts until we get to the end of the
-          # template
           parse_template_body until @lexer.lookahead.type == :TEMPLATE_CLOSE
 
           # parse the </template> tag
@@ -88,8 +84,6 @@ module Elements
         end
       end
 
-      # XXX is there a way to make this return an array? or maybe there's a way
-      # to parse a template without the start and end tags?
       def parse_template_body
         case @lexer.lookahead.type
         when :OPEN_CARET # "<"
