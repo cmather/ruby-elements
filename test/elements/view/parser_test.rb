@@ -1,15 +1,6 @@
 require "test_helper"
 require "elements/view/parser"
 
-# XXX we need a better way to come up with tests for the template stuff.
-# otherwise we'll be throwing random tests and hoping for the best. let's make
-# that part more robust.
-# XXX let's do actual unit testing and then we'll do some integration tests that
-# cover various scenarios. the unit testing should cover specific cases in the
-# parse methods. the return values, different states of the stack, etc. just go
-# method by method and test each one. then have an area of miscl parsing where
-# we test for various parsing ideas to catch the big picture stuff!
-
 describe "Elements::View::Parser" do
   describe "parse_attribute" do
     it "parses boolean attribute" do
@@ -241,7 +232,17 @@ describe "Elements::View::Parser" do
     end
 
     it "should correctly set location" do
-      # TODO
+      input = "some text for you"
+      parser = Elements::View::Parser.new(input, state: :template)
+      result = parser.parse_text
+
+      assert result, "no ast node result from parse_text"
+      assert_equal 0, result.location.start.index, "wrong start index"
+      assert_equal 0, result.location.start.column, "wrong start column"
+      assert_equal 1, result.location.start.line, "wrong start line"
+      assert_equal input.size, result.location.finish.index, "wrong finish index"
+      assert_equal input.size, result.location.finish.column, "wrong finish column"
+      assert_equal 1, result.location.finish.line, "wrong finish line"
     end
   end
 
@@ -497,6 +498,164 @@ describe "Elements::View::Parser" do
       assert_equal input.size, result.location.finish.index, "wrong finish index"
       assert_equal input.size, result.location.finish.column, "wrong finish column"
       assert_equal 1, result.location.finish.line, "wrong finish line"
+    end
+  end
+
+  describe "parse_document" do
+    it "should parse an empty document" do
+      input = ""
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_document
+      assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
+    end
+
+    it "should parse content outside of templates" do
+      input = "random content require 'some/path'"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_document
+      assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
+      assert_equal 1, result.body.size, "any node not added to document body"
+      assert_instance_of Elements::View::AST::Any, result.body[0], "expected AST::Any node"
+      assert_equal input, result.body[0].value, "wrong AST::Any node value in document body"
+    end
+
+    it "should parse templates" do
+      input = "<template></template><template></template>"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_document
+      assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
+      assert_equal 2, result.body.size, "should be two templates in document body"
+      assert_instance_of Elements::View::AST::Template, result.body[0], "wrong ast node"
+      assert_instance_of Elements::View::AST::Template, result.body[1], "wrong ast node"
+    end
+
+    it "should parse mixed content" do
+      input = "before<template></template>middle<template></template>after"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_document
+      assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
+      assert_equal 5, result.body.size, "wrong body size"
+
+      expected = [
+        Elements::View::AST::Any,
+        Elements::View::AST::Template,
+        Elements::View::AST::Any,
+        Elements::View::AST::Template,
+        Elements::View::AST::Any
+      ]
+
+      assert_equal expected, result.body.map { |n| n.class }, "wrong ast nodes in body"
+    end
+
+    it "should set correct location" do
+      input = "before<template></template>middle<template></template>after"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_document
+      assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
+      assert_equal 5, result.body.size, "wrong body size"
+
+      assert_equal 0, result.location.start.index, "wrong start index"
+      assert_equal 0, result.location.start.column, "wrong start column"
+      assert_equal 1, result.location.start.line, "wrong start line"
+      assert_equal input.size, result.location.finish.index, "wrong finish index"
+      assert_equal input.size, result.location.finish.column, "wrong finish column"
+      assert_equal 1, result.location.finish.line, "wrong finish line"
+    end
+  end
+
+  describe "parse_template" do
+    it "should parse simple template" do
+      input = "<template></template>"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_template
+      assert_instance_of Elements::View::AST::Template, result, "wrong ast node"
+    end
+
+    it "should parse template attributes" do
+      input = "<template attr1='val1' attr2=val2 attr3=\"val3\"></template>"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_template
+      assert_instance_of Elements::View::AST::Template, result, "wrong ast node"
+      expected = [["attr1", "val1"], ["attr2", "val2"], ["attr3", "val3"]]
+      assert_equal expected, result.attributes.map { |n| [n.name, n.value] }, "wrong attributes"
+    end
+
+    it "should parse template body" do
+      input = "<template><div></div><div></div></template>"
+      parser = Elements::View::Parser.new(input, state: :default)
+      result = parser.parse_template
+      assert_instance_of Elements::View::AST::Template, result, "wrong ast node"
+      assert_equal 2, result.body.size, "wrong body size"
+    end
+  end
+
+  describe "miscl input" do
+    it "any content with one template" do
+      input = <<-EOF
+        require "some/path/to.css"
+
+        class Bogus
+        end
+
+        <template name="MyTemplate">
+          <h1>Title</h1>
+
+          <p>
+            Some description for you.
+          </p>
+        </template>
+      EOF
+
+      parser = Elements::View::Parser.new(input)
+      result = parser.parse
+      assert result, "no ast result"
+    end
+
+    it "any content with two templates" do
+      input = <<-EOF
+        require "some/path/to.css"
+
+        class Bogus
+        end
+
+        <template name="One">
+          <h1>Title</h1>
+
+          <p>
+            Some description for you.
+          </p>
+        </template>
+
+        <template name="Two">
+          <h1>Title</h1>
+
+          <p>
+            Some description for you.
+          </p>
+        </template>
+      EOF
+
+      parser = Elements::View::Parser.new(input)
+      result = parser.parse
+      assert result, "no ast result"
+    end
+
+    it "self closing tags" do
+      input = <<-EOF
+        <template name="One">
+          <h1>Title</h1>
+
+          <ul>
+            <li>One
+            <li>Two
+            <li>Three
+          </ul>
+        </template>
+      EOF
+
+      parser = Elements::View::Parser.new(input.strip)
+      result = parser.parse
+      assert result, "no ast result"
     end
   end
 end

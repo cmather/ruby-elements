@@ -24,6 +24,14 @@ module Elements
         def <<(node)
           raise NotImplementedError
         end
+
+        def to_s
+          "#{self.class.name}"
+        end
+
+        def inspect
+          "#<#{self.class.name}>"
+        end
       end
 
       class NodeCollection
@@ -66,6 +74,18 @@ module Elements
         def each(&block)
           return to_enum(:each) unless block_given?
           @children.each(&block)
+        end
+
+        def last
+          @children.last
+        end
+
+        def to_s
+          @children.map(&:to_s)
+        end
+
+        def inspect
+          to_s
         end
       end
 
