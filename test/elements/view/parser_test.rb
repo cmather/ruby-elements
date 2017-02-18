@@ -8,8 +8,9 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal "focused", result.name, "wrong attribute name"
-      assert_equal true, result.value, "wrong boolean attribute value"
+      assert_equal "focused", result.name.value, "wrong attribute name"
+      assert_nil result.value, "wrong boolean attribute value"
+      assert result.boolean?, "attribute should be boolean"
     end
 
     it "parses single quoted attribute" do
@@ -17,8 +18,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal "class", result.name, "wrong attribute name"
-      assert_equal "my-class", result.value, "wrong attribute value"
+      assert_equal "class", result.name.value, "wrong attribute name"
+      assert_equal "my-class", result.value.value, "wrong attribute value"
     end
 
     it "parses double quoted attribute" do
@@ -26,8 +27,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal "class", result.name, "wrong attribute name"
-      assert_equal "my-class", result.value, "wrong attribute value"
+      assert_equal "class", result.name.value, "wrong attribute name"
+      assert_equal "my-class", result.value.value, "wrong attribute value"
     end
 
     it "parses random unquoted characters" do
@@ -37,8 +38,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal name, result.name, "wrong attribute name"
-      assert_equal value, result.value, "wrong attribute value"
+      assert_equal name, result.name.value, "wrong attribute name"
+      assert_equal value, result.value.value, "wrong attribute value"
     end
 
     it "parses unquoted hex characters" do
@@ -48,8 +49,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal name, result.name, "wrong attribute name"
-      assert_equal value, result.value, "wrong attribute value"
+      assert_equal name, result.name.value, "wrong attribute name"
+      assert_equal value, result.value.value, "wrong attribute value"
     end
 
     it "parses unquoted percent characters" do
@@ -59,8 +60,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal name, result.name, "wrong attribute name"
-      assert_equal value, result.value, "wrong attribute value"
+      assert_equal name, result.name.value, "wrong attribute name"
+      assert_equal value, result.value.value, "wrong attribute value"
     end
 
     it "consumes whitespace" do
@@ -70,8 +71,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attribute
       assert_instance_of Elements::View::AST::Attribute, result, "wrong ast type"
-      assert_equal name, result.name, "wrong attribute name"
-      assert_equal value, result.value, "wrong attribute value"
+      assert_equal name, result.name.value, "wrong attribute name"
+      assert_equal value, result.value.value, "wrong attribute value"
     end
   end
 
@@ -81,8 +82,8 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(source, state: :attributes)
       result = parser.parse_attributes
       assert_instance_of Array, result, "expected array"
-      expected = [["name1", "value1"], ["name2", "value2"], ["name3", "100%"],["name4", true]]
-      actual = result.map { |attr| [attr.name, attr.value] }
+      expected = [["name1", "value1"], ["name2", "value2"], ["name3", "100%"],["name4", nil]]
+      actual = result.map { |attr| [attr.name.value, attr.value && attr.value.value] }
       assert_equal expected, actual, "wrong attributes"
     end
   end
@@ -103,7 +104,7 @@ describe "Elements::View::Parser" do
       result = parser.parse_any
       assert_instance_of Elements::View::AST::Any, result, "wrong ast node"
       assert_equal doc_node, result.parent, "wrong parent"
-      assert_equal result, doc_node.body.first, "not added to children of parent node"
+      assert_equal result, doc_node.children.first, "not added to children of parent node"
     end
 
     it "should correctly set location" do
@@ -148,7 +149,7 @@ describe "Elements::View::Parser" do
       result = parser.parse_comment
       assert result, "no comment ast node"
       assert_equal template_node, result.parent
-      assert_equal template_node.body[0], result, "comment not added as child to template"
+      assert_equal template_node.children[0], result, "comment not added as child to template"
     end
 
     it "should add comment as child to element node" do
@@ -206,7 +207,7 @@ describe "Elements::View::Parser" do
       result = parser.parse_text
       assert result, "no ast node"
       assert_equal template_node, result.parent
-      assert_equal template_node.body[0], result, "not added as child to template"
+      assert_equal template_node.children[0], result, "not added as child to template"
     end
 
     it "should add text as child to element node" do
@@ -327,7 +328,7 @@ describe "Elements::View::Parser" do
         ["data-key", "dataval"]
       ]
 
-      assert_equal expected, result.attributes.map { |a| [a.name, a.value] }, "wrong attributes"
+      assert_equal expected, result.attributes.map { |a| [a.name.value, a.value.value] }, "wrong attributes"
     end
 
     it "should parse view attributes" do
@@ -342,7 +343,7 @@ describe "Elements::View::Parser" do
         ["data-key", "dataval"]
       ]
 
-      assert_equal expected, result.attributes.map { |a| [a.name, a.value] }, "wrong attributes"
+      assert_equal expected, result.attributes.map { |a| [a.name.value, a.value.value] }, "wrong attributes"
     end
 
     it "should not push void tags onto stack" do
@@ -514,9 +515,9 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(input, state: :default)
       result = parser.parse_document
       assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
-      assert_equal 1, result.body.size, "any node not added to document body"
-      assert_instance_of Elements::View::AST::Any, result.body[0], "expected AST::Any node"
-      assert_equal input, result.body[0].value, "wrong AST::Any node value in document body"
+      assert_equal 1, result.children.size, "any node not added to document children"
+      assert_instance_of Elements::View::AST::Any, result.children[0], "expected AST::Any node"
+      assert_equal input, result.children[0].value, "wrong AST::Any node value in document children"
     end
 
     it "should parse templates" do
@@ -524,9 +525,9 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(input, state: :default)
       result = parser.parse_document
       assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
-      assert_equal 2, result.body.size, "should be two templates in document body"
-      assert_instance_of Elements::View::AST::Template, result.body[0], "wrong ast node"
-      assert_instance_of Elements::View::AST::Template, result.body[1], "wrong ast node"
+      assert_equal 2, result.children.size, "should be two templates in document children"
+      assert_instance_of Elements::View::AST::Template, result.children[0], "wrong ast node"
+      assert_instance_of Elements::View::AST::Template, result.children[1], "wrong ast node"
     end
 
     it "should parse mixed content" do
@@ -534,7 +535,7 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(input, state: :default)
       result = parser.parse_document
       assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
-      assert_equal 5, result.body.size, "wrong body size"
+      assert_equal 5, result.children.size, "wrong children size"
 
       expected = [
         Elements::View::AST::Any,
@@ -544,7 +545,7 @@ describe "Elements::View::Parser" do
         Elements::View::AST::Any
       ]
 
-      assert_equal expected, result.body.map { |n| n.class }, "wrong ast nodes in body"
+      assert_equal expected, result.children.map { |n| n.class }, "wrong ast nodes in children"
     end
 
     it "should set correct location" do
@@ -552,7 +553,7 @@ describe "Elements::View::Parser" do
       parser = Elements::View::Parser.new(input, state: :default)
       result = parser.parse_document
       assert_instance_of Elements::View::AST::Document, result, "wrong ast node"
-      assert_equal 5, result.body.size, "wrong body size"
+      assert_equal 5, result.children.size, "wrong children size"
 
       assert_equal 0, result.location.start.index, "wrong start index"
       assert_equal 0, result.location.start.column, "wrong start column"
@@ -577,15 +578,15 @@ describe "Elements::View::Parser" do
       result = parser.parse_template
       assert_instance_of Elements::View::AST::Template, result, "wrong ast node"
       expected = [["attr1", "val1"], ["attr2", "val2"], ["attr3", "val3"]]
-      assert_equal expected, result.attributes.map { |n| [n.name, n.value] }, "wrong attributes"
+      assert_equal expected, result.attributes.map { |n| [n.name.value, n.value.value] }, "wrong attributes"
     end
 
-    it "should parse template body" do
+    it "should parse template children" do
       input = "<template><div></div><div></div></template>"
       parser = Elements::View::Parser.new(input, state: :default)
       result = parser.parse_template
       assert_instance_of Elements::View::AST::Template, result, "wrong ast node"
-      assert_equal 2, result.body.size, "wrong body size"
+      assert_equal 2, result.children.size, "wrong children size"
     end
   end
 

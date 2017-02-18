@@ -11,7 +11,7 @@ module Elements
         @lexer = Lexer.new(io, opts)
         @lexer.scan
 
-        # i'll keep an explicit stack vs. just a call stack because we need to
+        # I'll keep an explicit stack vs. just a call stack because we need to
         # be able to unwind the stack for autoclosing html tags and error
         # handling. So rather than have one part of the parser be recursive
         # descent with functions and another part of the parser use an explicit
@@ -141,7 +141,11 @@ module Elements
         # the stack will then become the parent.
         @stack.last << ast_node unless @stack.empty?
 
-        # parse the tag's attributes
+        # parse the tag's attributes. note: the AST::AttributesCollection
+        # instance is pushed onto the stack so that any attributes get added to
+        # that collection since it'll be the last node on the stack. when you
+        # see @stack.last << attribute in the parse_attribute function that's
+        # what it's doing.
         @stack.push(ast_node.attributes)
         parse_attributes
         @stack.pop()
@@ -257,20 +261,27 @@ module Elements
         end
       end
 
+      # XXX add nodes for AttributeName and AttributeValue along with their own
+      # locations so that we can show precise errors for attributes we don't
+      # understand. Like highlighting just the name, or just the value in an
+      # error message! boom.
       def parse_attribute
         name_token = match(:ATTRIBUTE_NAME)
+        name_node = AST::AttributeName.new(name_token.value, name_token.location)
 
         if @lexer.lookahead.type == :EQUALS
           match(:EQUALS)
           value_token = match(:ATTRIBUTE_VALUE)
-          location = Location.from_tokens(name_token, value_token)
-          value = value_token.value
+          attr_location = Location.from_tokens(name_token, value_token)
+          value_node = AST::AttributeValue.new(value_token.value, value_token.location)
+          boolean = false
         else
-          location = Location.from_tokens(name_token, name_token)
-          value = true
+          attr_location = Location.from_tokens(name_token, name_token)
+          value_node = nil
+          boolean = true
         end
 
-        AST::Attribute.new(name_token.value, value, location).tap do |ast_node|
+        AST::Attribute.new(name_node, value_node, boolean, attr_location).tap do |ast_node|
           @stack.last << ast_node unless @stack.empty?
         end
       end

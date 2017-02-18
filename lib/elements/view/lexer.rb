@@ -36,7 +36,8 @@ module Elements
         # tag symbols
         OPEN_CARET_FORWARD_SLASH             = /<\//
         # FIXME open caret should exclude <template so we don't end up with a
-        # nested template tag.
+        # nested template tag. or actually nested templates are a good thing so
+        # we'll come back to this idea.
         OPEN_CARET                           = /</
         CLOSE_CARET                          = />/
         FORWARD_SLASH_CLOSE_CARET            = /\/>/
