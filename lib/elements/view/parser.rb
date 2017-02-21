@@ -23,7 +23,7 @@ module Elements
         @stack.size
       end
 
-      def parse_document
+      def parse
         AST::Document.new.tap do |ast_node|
           @stack.push(ast_node)
           parse_document_body until @lexer.eof?
@@ -31,14 +31,42 @@ module Elements
         end
       end
 
-      alias_method :parse, :parse_document
+      alias_method :parse_document, :parse
 
+      def parse_template
+        # The lexer has to be in the :template state in order to parse template
+        # body things. Normally, if a template is parsed as part of a document
+        # the lexer is automatically put into the template state when it sees
+        # the <template open tag. But if this method is called we want to parse
+        # the template body directly, without looking for <template></template>
+        # open and close tags. So we need to put the lexer into the :template
+        # state directly, ourselves.
+        @lexer.state = :template
+
+        AST::Template.new.tap do |ast_node|
+          # push ourselves onto the stack
+          @stack.push(ast_node)
+
+          # until we reach the end of the file add the template's children
+          parse_template_body until @lexer.eof?
+
+          if ast_node.children.size > 0
+            ast_node.location.start = ast_node.children.first.location.start.dup
+            ast_node.location.finish = ast_node.children.first.location.finish.dup
+          end
+
+          # pop the template ast node off the stack
+          @stack.pop()
+        end
+      end
+
+      private
       def parse_document_body
         case @lexer.lookahead.type
         when :ANY
           parse_any
         when :TEMPLATE_OPEN
-          parse_template
+          parse_template_tag
         else
           error
         end
@@ -51,7 +79,7 @@ module Elements
         end
       end
 
-      def parse_template
+      def parse_template_tag
         AST::Template.new.tap do |ast_node|
           # make this template the child of whatever is on the stack which
           @stack.last << ast_node unless @stack.empty?
@@ -59,6 +87,7 @@ module Elements
           # now push ourselves onto the stack
           @stack.push(ast_node)
 
+          # parse template tag.
           open_tag_token = match(:TEMPLATE_OPEN)
 
           # parse the template's attributes
@@ -261,10 +290,6 @@ module Elements
         end
       end
 
-      # XXX add nodes for AttributeName and AttributeValue along with their own
-      # locations so that we can show precise errors for attributes we don't
-      # understand. Like highlighting just the name, or just the value in an
-      # error message! boom.
       def parse_attribute
         name_token = match(:ATTRIBUTE_NAME)
         name_node = AST::AttributeName.new(name_token.value, name_token.location)
@@ -286,7 +311,6 @@ module Elements
         end
       end
 
-      private
       def match(type, &block)
         token = @lexer.lookahead
 

@@ -12,10 +12,6 @@ module Elements
       def to_s
         "'#{@value.to_s}'"
       end
-
-      def inspect
-        "#<Token type='#{@type}' value='#{@value}' location=#{@location}>"
-      end
     end
 
     class Lexer
@@ -67,7 +63,7 @@ module Elements
 
       attr_reader :lookahead
       attr_reader :source
-      attr_reader :state
+      attr_accessor :state
 
       def initialize(io, opts = {})
         @source = if io.respond_to?(:read) then io.read else io; end
