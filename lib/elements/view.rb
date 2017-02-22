@@ -1,1 +1,4 @@
-require "elements/view/parser"
+module Elements
+  class View
+  end
+end
