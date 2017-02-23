@@ -1,24 +1,24 @@
 require "test_helper"
-require "elements/ast"
+require "elements/template/ast"
 
-describe "Elements::AST" do
+describe "Elements::Template::AST" do
   def create_document_ast(children = [])
-    Elements::AST::Document.new.tap do |document_ast|
+    Elements::Template::AST::Document.new.tap do |document_ast|
       children.each { |child_node| document_ast << child_node }
     end
   end
 
   def create_attribute_ast(name, value = nil)
-    name_ast = Elements::AST::AttributeName.new(name)
+    name_ast = Elements::Template::AST::AttributeName.new(name)
     if value.nil?
       value_ast = nil
       boolean = true
     else
-      value_ast = Elements::AST::AttributeValue.new(value)
+      value_ast = Elements::Template::AST::AttributeValue.new(value)
       boolean = false
     end
 
-    Elements::AST::Attribute.new(name_ast, value_ast, boolean)
+    Elements::Template::AST::Attribute.new(name_ast, value_ast, boolean)
   end
 
   def assign_attributes(ast, attributes)
@@ -28,7 +28,7 @@ describe "Elements::AST" do
   end
 
   def create_template_ast(attributes = {}, children = [])
-    Elements::AST::Template.new.tap do |template_ast|
+    Elements::Template::AST::Template.new.tap do |template_ast|
       assign_attributes(template_ast, attributes)
       children.each { |child_node| template_ast << child_node }
     end
@@ -37,22 +37,22 @@ describe "Elements::AST" do
   def create_element_ast(tagname, attributes = {}, children = [])
     re = /(?:(?<namespace>\w+):)?(?<tagname>\w+)/
     match = re.match(tagname)
-    Elements::AST::Element.new(match[:tagname], match[:namespace]).tap do |element_ast|
+    Elements::Template::AST::Element.new(match[:tagname], match[:namespace]).tap do |element_ast|
       assign_attributes(element_ast, attributes)
       children.each { |child| element_ast.children << child }
     end
   end
 
   def create_any_ast(value)
-    Elements::AST::Any.new(value)
+    Elements::Template::AST::Any.new(value)
   end
 
   def create_text_ast(value)
-    Elements::AST::Text.new(value)
+    Elements::Template::AST::Text.new(value)
   end
 
   def create_comment_ast(value)
-    Elements::AST::Comment.new(value)
+    Elements::Template::AST::Comment.new(value)
   end
 
   def assert_preorder_traversal(expected, ast)
@@ -68,15 +68,15 @@ describe "Elements::AST" do
       ])
 
       expected = [
-        Elements::AST::Document,
-        Elements::AST::Any,
-        Elements::AST::Template,
-        Elements::AST::AttributeCollection,
-        Elements::AST::Attribute,
-        Elements::AST::AttributeName,
-        Elements::AST::AttributeValue,
-        Elements::AST::Text,
-        Elements::AST::Any
+        Elements::Template::AST::Document,
+        Elements::Template::AST::Any,
+        Elements::Template::AST::Template,
+        Elements::Template::AST::AttributeCollection,
+        Elements::Template::AST::Attribute,
+        Elements::Template::AST::AttributeName,
+        Elements::Template::AST::AttributeValue,
+        Elements::Template::AST::Text,
+        Elements::Template::AST::Any
       ]
 
       assert_preorder_traversal(expected, ast)
@@ -90,12 +90,12 @@ describe "Elements::AST" do
       ])
 
       expected = [
-        Elements::AST::Template,
-        Elements::AST::AttributeCollection,
-        Elements::AST::Attribute,
-        Elements::AST::AttributeName,
-        Elements::AST::AttributeValue,
-        Elements::AST::Text
+        Elements::Template::AST::Template,
+        Elements::Template::AST::AttributeCollection,
+        Elements::Template::AST::Attribute,
+        Elements::Template::AST::AttributeName,
+        Elements::Template::AST::AttributeValue,
+        Elements::Template::AST::Text
       ]
 
       assert_preorder_traversal(expected, ast)
@@ -112,18 +112,18 @@ describe "Elements::AST" do
       ])
 
       expected = [
-        Elements::AST::Element,
-        Elements::AST::AttributeCollection,
-        Elements::AST::Attribute,
-        Elements::AST::AttributeName,
-        Elements::AST::AttributeValue,
-        Elements::AST::Attribute,
-        Elements::AST::AttributeName,
-        Elements::AST::AttributeValue,
-        Elements::AST::Text,
-        Elements::AST::Element,
-        Elements::AST::AttributeCollection,
-        Elements::AST::Text
+        Elements::Template::AST::Element,
+        Elements::Template::AST::AttributeCollection,
+        Elements::Template::AST::Attribute,
+        Elements::Template::AST::AttributeName,
+        Elements::Template::AST::AttributeValue,
+        Elements::Template::AST::Attribute,
+        Elements::Template::AST::AttributeName,
+        Elements::Template::AST::AttributeValue,
+        Elements::Template::AST::Text,
+        Elements::Template::AST::Element,
+        Elements::Template::AST::AttributeCollection,
+        Elements::Template::AST::Text
       ]
 
       assert_preorder_traversal(expected, ast)
@@ -135,9 +135,9 @@ describe "Elements::AST" do
       ast = create_attribute_ast("class", "some-class")
 
       expected = [
-        Elements::AST::Attribute,
-        Elements::AST::AttributeName,
-        Elements::AST::AttributeValue
+        Elements::Template::AST::Attribute,
+        Elements::Template::AST::AttributeName,
+        Elements::Template::AST::AttributeValue
       ]
 
       assert_preorder_traversal(expected, ast)

@@ -1,4 +1,1 @@
-module Elements
-  class View
-  end
-end
+require "elements/view/base"
