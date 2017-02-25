@@ -2,6 +2,7 @@ require "elements/template/lexer"
 require "elements/template/ast"
 require "elements/template/tag_helpers"
 
+# XXX put filepath and sourcecode on location object so we can use it later.
 # XXX add filepath option? the filepath should be used in the name of a template
 # that is not inline. If there is no filepath provided, and no name attribute on
 # the template tag we should raise a parser error. an inline template is one
@@ -18,6 +19,8 @@ require "elements/template/tag_helpers"
 # parser state vs. a reflection of the source code. so where would the ast node
 # get the filename from? if there was an error where would the source line
 # number come from?
+# XXX should attribute collection be an actual ast node with location? seems
+# like it should.
 module Elements
   module Template
     class Parser
@@ -26,7 +29,6 @@ module Elements
       def initialize(io, options = {})
         @options = options
         @lexer = Lexer.new(io, options)
-        @lexer.scan
         # I'll keep an explicit stack vs. just a call stack because we need to
         # be able to unwind the stack for autoclosing html tags and error
         # handling. So rather than have one part of the parser be recursive
@@ -42,6 +44,7 @@ module Elements
       def parse
         AST::Document.new.tap do |ast_node|
           @stack.push(ast_node)
+          @lexer.scan
           parse_document_body until @lexer.eof?
           @stack.pop()
         end
@@ -56,18 +59,21 @@ module Elements
       # XXX a template should alias the call method to the render method. that way
       # we can treat a template as a block which is pretty awesome.
       def parse_template
-        # The lexer has to be in the :template state in order to parse template
-        # body things. Normally, if a template is parsed as part of a document
-        # the lexer is automatically put into the template state when it sees
-        # the <template open tag. But if this method is called we want to parse
-        # the template body directly, without looking for <template></template>
-        # open and close tags. So we need to put the lexer into the :template
-        # state directly, ourselves.
-        @lexer.state = :template
-
         AST::Template.new.tap do |ast_node|
           # push ourselves onto the stack
           @stack.push(ast_node)
+
+          # The lexer has to be in the :template state in order to parse template
+          # body things. Normally, if a template is parsed as part of a document
+          # the lexer is automatically put into the template state when it sees
+          # the <template open tag. But if this method is called we want to parse
+          # the template body directly, without looking for <template></template>
+          # open and close tags. So we need to put the lexer into the :template
+          # state directly, ourselves.
+          @lexer.state = :template
+
+          # Now that the lexer is in the correct state, scan the first token.
+          @lexer.scan
 
           # until we reach the end of the file add the template's children
           parse_template_body until @lexer.eof?
@@ -357,6 +363,10 @@ module Elements
       class << self
         def parse(io, opts = {})
           new(io, opts).parse
+        end
+
+        def parse_template(io, opts = {})
+          new(io, opts).parse_template
         end
       end
     end
