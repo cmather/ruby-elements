@@ -1,26 +1,9 @@
+# XXX fix ast constructor calls to use options hash and pass source, filepath
+# and location.
 require "elements/template/lexer"
 require "elements/template/ast"
 require "elements/template/tag_helpers"
 
-# XXX put filepath and sourcecode on location object so we can use it later.
-# XXX add filepath option? the filepath should be used in the name of a template
-# that is not inline. If there is no filepath provided, and no name attribute on
-# the template tag we should raise a parser error. an inline template is one
-# where a template is already on the template stack so we mark the template as
-# inline and it has no name.
-# XXX if a name is on the template we split the name by "::" and create modules
-# for each top level and then finally a class for the final thing. if there is
-# no name then what should we do? perhaps then it's an anonymous template? I
-# think that's confusing.
-# XXX inline templates and attribute naming. the ast should really reflect the
-# source code. if there's no name attribute the place to compile with a name is
-# in the compiler. we should not add a new ast node for this! the only thing we
-# should be doing is compiling to inline or not inline. that's a property of the
-# parser state vs. a reflection of the source code. so where would the ast node
-# get the filename from? if there was an error where would the source line
-# number come from?
-# XXX should attribute collection be an actual ast node with location? seems
-# like it should.
 module Elements
   module Template
     class Parser
@@ -28,7 +11,9 @@ module Elements
 
       def initialize(io, options = {})
         @options = options
-        @lexer = Lexer.new(io, options)
+        @source = if io.respond_to?(:read) then io.read else io; end
+        @filepath = @options[:filepath]
+        @lexer = Lexer.new(@source, options)
         # I'll keep an explicit stack vs. just a call stack because we need to
         # be able to unwind the stack for autoclosing html tags and error
         # handling. So rather than have one part of the parser be recursive
@@ -42,7 +27,9 @@ module Elements
       end
 
       def parse
-        AST::Document.new.tap do |ast_node|
+        AST::Document.new(
+          with_default_options({})
+        ).tap do |ast_node|
           @stack.push(ast_node)
           @lexer.scan
           parse_document_body until @lexer.eof?
@@ -52,14 +39,10 @@ module Elements
 
       alias_method :parse_document, :parse
 
-      # XXX so here in the direct parser method we want to use the filename as the
-      # template name perhaps? what do we really want with direct template
-      # parsing? perhaps we want an inline template so we just say
-      # Template.new({}, []) and then we can call render on it if we want.
-      # XXX a template should alias the call method to the render method. that way
-      # we can treat a template as a block which is pretty awesome.
       def parse_template
-        AST::Template.new.tap do |ast_node|
+        AST::Template.new(
+          with_default_options({inline: true})
+        ).tap do |ast_node|
           # push ourselves onto the stack
           @stack.push(ast_node)
 
@@ -102,16 +85,21 @@ module Elements
 
       def parse_any
         token = match(:ANY)
-        AST::Any.new(token.value, token.location).tap do |ast_node|
+        AST::Any.new(
+          token.value,
+          with_default_options({location: token.location.dup})
+        ).tap do |ast_node|
           @stack.last << ast_node unless @stack.empty?
         end
       end
 
-      # XXX but here we're either creating a top level template from a template
-      # tag, in which case we probably want the full namespace. the full namespace
-      # can come from the attributes or from the filepath.
+      # FIXME the inline part depends on if there is a template on the template
+      # stack. so add that when we add the inline templates feature. and add a
+      # test for it.
       def parse_template_tag
-        AST::Template.new.tap do |ast_node|
+        AST::Template.new(
+          with_default_options({inline: false})
+        ).tap do |ast_node|
           # make this template the child of whatever is on the stack which
           @stack.last << ast_node unless @stack.empty?
 
@@ -180,9 +168,15 @@ module Elements
 
         if type == :element
           namespace = namespace_token ? namespace_token.value : nil
-          ast_node = AST::Element.new(name_token.value, namespace)
+          ast_node = AST::Element.new(
+            name_token.value,
+            with_default_options({namespace: namespace})
+          )
         elsif type == :view
-          ast_node = AST::View.new(name_token.value)
+          ast_node = AST::View.new(
+            name_token.value,
+            with_default_options({})
+          )
         end
 
         # if the last node on the stack is an element let's see if we're
@@ -227,8 +221,8 @@ module Elements
         # for now set the finish location to be the end of the open tag. if
         # there ends up being a corresponding closing tag down the road then
         # we'll update the finish location to be the end of the closing tag.
-        ast_node.location.start = start_token.location.start
-        ast_node.location.finish = finish_token.location.finish
+        ast_node.location.start = start_token.location.start.dup
+        ast_node.location.finish = finish_token.location.finish.dup
 
         # and finally, return the new ast node to the caller
         ast_node
@@ -301,7 +295,10 @@ module Elements
       def parse_comment
         token = match(:COMMENT)
 
-        AST::Comment.new(token.value, token.location).tap do |ast_node|
+        AST::Comment.new(
+          token.value,
+          with_default_options({location: token.location.dup})
+        ).tap do |ast_node|
           @stack.last << ast_node unless @stack.empty?
         end
       end
@@ -309,7 +306,10 @@ module Elements
       def parse_text
         token = match(:TEXT)
 
-        AST::Text.new(token.value, token.location).tap do |ast_node|
+        AST::Text.new(
+          token.value,
+          with_default_options({location: token.location.dup})
+        ).tap do |ast_node|
           @stack.last << ast_node unless @stack.empty?
         end
       end
@@ -324,21 +324,29 @@ module Elements
 
       def parse_attribute
         name_token = match(:ATTRIBUTE_NAME)
-        name_node = AST::AttributeName.new(name_token.value, name_token.location)
+        name_node = AST::AttributeName.new(
+          name_token.value,
+          with_default_options({location: name_token.location.dup})
+        )
 
         if @lexer.lookahead.type == :EQUALS
           match(:EQUALS)
           value_token = match(:ATTRIBUTE_VALUE)
           attr_location = Location.from_tokens(name_token, value_token)
-          value_node = AST::AttributeValue.new(value_token.value, value_token.location)
-          boolean = false
+          value_node = AST::AttributeValue.new(
+            value_token.value,
+            with_default_options({location: value_token.location.dup})
+          )
         else
           attr_location = Location.from_tokens(name_token, name_token)
           value_node = nil
-          boolean = true
         end
 
-        AST::Attribute.new(name_node, value_node, boolean, attr_location).tap do |ast_node|
+        AST::Attribute.new(
+          name_node,
+          value_node,
+          with_default_options({location: attr_location})
+        ).tap do |ast_node|
           @stack.last << ast_node unless @stack.empty?
         end
       end
@@ -353,6 +361,10 @@ module Elements
         else
           error
         end
+      end
+
+      def with_default_options(**options)
+        { source: @source, filepath: @filepath }.merge(options)
       end
 
       def error(msg = nil, location = nil)

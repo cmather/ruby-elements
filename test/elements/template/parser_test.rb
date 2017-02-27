@@ -426,7 +426,7 @@ describe "Elements::Template::Parser" do
     end
 
     it "should parse a close element tag with namespace" do
-      open_node = Elements::Template::AST::Element.new("div", "ns")
+      open_node = Elements::Template::AST::Element.new("div", namespace: "ns")
       input = "</ns:div>"
       parser = Elements::Template::Parser.new(input, state: :template)
       parser.instance_eval { @stack.push(open_node) }
