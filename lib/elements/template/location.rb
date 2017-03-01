@@ -25,6 +25,10 @@ module Elements
         @start, @finish = start, finish
       end
 
+      def dup
+        Location.new(@start.dup, @finish.dup)
+      end
+
       def to_s
         "[#{@start}..#{@finish})"
       end

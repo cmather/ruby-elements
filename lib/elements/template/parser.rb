@@ -1,5 +1,3 @@
-# XXX fix ast constructor calls to use options hash and pass source, filepath
-# and location.
 require "elements/template/lexer"
 require "elements/template/ast"
 require "elements/template/tag_helpers"
@@ -14,26 +12,39 @@ module Elements
         @source = if io.respond_to?(:read) then io.read else io; end
         @filepath = @options[:filepath]
         @lexer = Lexer.new(@source, options)
-        # I'll keep an explicit stack vs. just a call stack because we need to
-        # be able to unwind the stack for autoclosing html tags and error
-        # handling. So rather than have one part of the parser be recursive
-        # descent with functions and another part of the parser use an explicit
-        # stack, I'll just use an explicit stack for all of it.
-        @stack = []
-      end
 
-      def stack_size
-        @stack.size
+        # Stack of all open ast nodes. We need another stack in addition to the
+        # call stack for two reasons: (1) to autoclose the prev tag if needed;
+        # (2) to know which template or tag we're adding children too. We can't
+        # use recursive descent because not all tags have close tags. For
+        # example, the parse_template_body uses a while loop to iterate over the
+        # content of a template. So to unify the approach, instead of passing a
+        # parent ast node to each of the recursive descent methods I'll just use
+        # this stack everywhere.
+        @stack = []
+
+        # I'll keep a separate template stack which overlaps a bit with the
+        # regular stack but only contains templates. This allows me to quickly
+        # check whether a new template is "inline" or nested inside another
+        # template, or if it's a top level template.
+        @template_stack = []
       end
 
       def parse
         AST::Document.new(
           with_default_options({})
         ).tap do |ast_node|
-          @stack.push(ast_node)
+          # Push the document node onto the stack
+          @stack << ast_node
+
+          # Scan the first token
           @lexer.scan
-          parse_document_body until @lexer.eof?
-          @stack.pop()
+
+          # Collect each document body child
+          parse_document_body
+
+          # Pop the document node off the stack
+          @stack.pop
         end
       end
 
@@ -43,43 +54,47 @@ module Elements
         AST::Template.new(
           with_default_options({inline: true})
         ).tap do |ast_node|
-          # push ourselves onto the stack
-          @stack.push(ast_node)
+          # Push ourselves onto the template stack since we're a template
+          @stack << ast_node
 
-          # The lexer has to be in the :template state in order to parse template
-          # body things. Normally, if a template is parsed as part of a document
-          # the lexer is automatically put into the template state when it sees
-          # the <template open tag. But if this method is called we want to parse
-          # the template body directly, without looking for <template></template>
-          # open and close tags. So we need to put the lexer into the :template
-          # state directly, ourselves.
-          @lexer.state = :template
+          # Also push the template onto the template stack.
+          @template_stack << ast_node
+
+          # Tell the lexer we're in a template now
+          @lexer.push_state Lexer::States::TEMPLATE
 
           # Now that the lexer is in the correct state, scan the first token.
           @lexer.scan
 
-          # until we reach the end of the file add the template's children
-          parse_template_body until @lexer.eof?
+          # Until we reach the end of the file add the template's children.
+          parse_template_body
 
+          # Since this is an anonymous template we want to set the start and
+          # finish location to the first and last child of the template.
           if ast_node.children.size > 0
             ast_node.location.start = ast_node.children.first.location.start.dup
             ast_node.location.finish = ast_node.children.first.location.finish.dup
           end
 
-          # pop the template ast node off the stack
-          @stack.pop()
+          # Pop the template off the template stack.
+          @template_stack.pop
+
+          # Pop the template node off the stack.
+          @stack.pop
         end
       end
 
       private
       def parse_document_body
-        case @lexer.lookahead.type
-        when :ANY
-          parse_any
-        when :TEMPLATE_OPEN
-          parse_template_tag
-        else
-          error
+        until @lexer.eof?
+          case @lexer.lookahead.type
+          when :ANY
+            parse_any
+          when :TEMPLATE_OPEN
+            parse_template_tag
+          else
+            error "Expected :ANY or :TEMPLATE_OPEN but got #{@lexer.lookahead}."
+          end
         end
       end
 
@@ -93,77 +108,97 @@ module Elements
         end
       end
 
-      # FIXME the inline part depends on if there is a template on the template
-      # stack. so add that when we add the inline templates feature. and add a
-      # test for it.
+      # Parses a template tag and adds it to the last template or tag on the
+      # stack.
       def parse_template_tag
         AST::Template.new(
-          with_default_options({inline: false})
+          with_default_options({
+            # if there are already templates on the template stack that means
+            # this must be an embedded (inline) template.
+            inline: @template_stack.size > 0
+          })
         ).tap do |ast_node|
           # make this template the child of whatever is on the stack which
           @stack.last << ast_node unless @stack.empty?
 
           # now push ourselves onto the stack
-          @stack.push(ast_node)
+          @stack << ast_node
 
-          # parse template tag.
+          # Also push ourselves onto the template stack.
+          @template_stack << ast_node
+
+          # Parse template tag.
           open_tag_token = match(:TEMPLATE_OPEN)
 
-          # parse the template's attributes
-          @stack.push(ast_node.attributes)
+          # Parse the template's attributes. To do this we'll push the
+          # template's attributes collection (AST::AttributesCollection) onto
+          # the stack. This way, the parse_attributes method can look for this
+          # item on the stack and add the attributes to it like this:
+          # @stack.last << attribute_ast_node.
+          @stack << ast_node.attributes
           parse_attributes
-          @stack.pop()
+          @stack.pop
 
-          # match the close of the open template tag <template ... >
+          # Match the close of the open template tag <template ... >
           match(:CLOSE_CARET)
 
-          parse_template_body until @lexer.lookahead.type == :TEMPLATE_CLOSE
+          # Parse the template's body
+          parse_template_body
 
-          # parse the </template> tag
+          # Parse the </template> tag
           close_tag_token = match(:TEMPLATE_CLOSE)
 
-          # now we've got the start and finish locations for the entire template
+          # Now we've got the start and finish locations for the entire template
           # so assign those locations to the template ast node.
           ast_node.location.start = open_tag_token.location.start
           ast_node.location.finish = close_tag_token.location.finish
 
-          # pop the template ast node off the stack
-          @stack.pop()
+          # Pop ourselves off the template stack.
+          @template_stack.pop
+
+          # Pop ourselves off the main stack.
+          @stack.pop
         end
       end
 
-      # FIXME allow nested "inline" anonymous templates
+      # Parses a template body adding each item to the last template or tag on
+      # the stack.
       def parse_template_body
-        case @lexer.lookahead.type
-        when :OPEN_CARET # "<"
-          parse_open_tag
-        when :OPEN_CARET_FORWARD_SLASH # "</"
-          parse_close_tag
-        when :COMMENT
-          parse_comment
-        when :TEXT
-          parse_text
-        else
-          error
+        until @lexer.lookahead.type == :TEMPLATE_CLOSE || @lexer.eof?
+          case @lexer.lookahead.type
+          when :TEMPLATE_OPEN
+            parse_template_tag
+          when :OPEN_CARET # "<"
+            parse_open_tag
+          when :OPEN_CARET_FORWARD_SLASH # "</"
+            parse_close_tag
+          when :COMMENT
+            parse_comment
+          when :TEXT
+            parse_text
+          else
+            error "Unexpected token in template body: #{@lexer.lookahead.type}"
+          end
         end
       end
 
+      # Parses an open tag and adds it to the last template or tag on the stack.
       def parse_open_tag
         start_token = match(:OPEN_CARET)
 
         case @lexer.lookahead.type
         when :TAG_NAMESPACE
           namespace_token = match(:TAG_NAMESPACE)
-          name_token = match(:TAG_NAME)
+          name_token = match(:ELEMENT_NAME)
           type = :element
-        when :TAG_NAME
-          name_token = match(:TAG_NAME)
+        when :ELEMENT_NAME
+          name_token = match(:ELEMENT_NAME)
           type = :element
         when :VIEW_NAME
           name_token = match(:VIEW_NAME)
           type = :view
         else
-          error
+          error "Expected to see a tag name but instead got: #{@lexer.lookahead}"
         end
 
         if type == :element
@@ -179,43 +214,41 @@ module Elements
           )
         end
 
-        # if the last node on the stack is an element let's see if we're
-        # supposed to autoclose it. if so we'll pop it off the stack. otherwise
-        # this new ast node will get added as a child.
-        if @stack.last.is_a?(AST::Element)
+        # Autoclose the last tag if it's one of the autoclosable tags like <li>.
+        # popping it off the tag stack closes the tag so that no more children
+        # are added to it.
+        unless @stack.empty?
           prev_tag_node = @stack.last
-          if can_auto_close_tag?(prev_tag_node.name, ast_node.name)
-            @stack.pop
-          end
+          @stack.pop if can_auto_close_tag?(prev_tag_node.name, ast_node.name)
         end
 
-        # if there's already an ast node on the stack then add this new ast node
+        # If there's already an ast node on the stack then add this new ast node
         # as a child of the node on the stack. note: we only autoclose the last
         # tag on the stack. i don't ever allow multiple unclosed items on the
         # stack. so at worst one tag will be autoclosed and the previous one on
         # the stack will then become the parent.
         @stack.last << ast_node unless @stack.empty?
 
-        # parse the tag's attributes. note: the AST::AttributesCollection
-        # instance is pushed onto the stack so that any attributes get added to
-        # that collection since it'll be the last node on the stack. when you
-        # see @stack.last << attribute in the parse_attribute function that's
-        # what it's doing.
-        @stack.push(ast_node.attributes)
+        # parse the tag's attributes.
+        @stack << ast_node.attributes
         parse_attributes
-        @stack.pop()
+        @stack.pop
 
         # now, maybe push the tag ast node onto the stack unless it's a void tag
         # or self closing. either way, grab the finish token so we can get a
         # final location object for the tag's ast node.
         case @lexer.lookahead.type
         when :CLOSE_CARET # ">"
+          # a close caret means we keep the tag open so push it onto the stack,
+          # unless it's one of the void tags like <br> or <hr>.
           finish_token = match(:CLOSE_CARET)
-          @stack.push(ast_node) unless type == :element && void_tag?(ast_node.name)
+          @stack << ast_node unless type == :element && void_tag?(ast_node.name)
         when :FORWARD_SLASH_CLOSE_CARET # "/>"
+          # if it's a /> then the tag is self closing so we don't need to push
+          # it onto the stack since it's already closed.
           finish_token = match(:FORWARD_SLASH_CLOSE_CARET)
         else
-          error
+          error "Expected to close the open tag with > or /> but instead got: #{@lexer.lookahead}"
         end
 
         # for now set the finish location to be the end of the open tag. if
@@ -228,22 +261,29 @@ module Elements
         ast_node
       end
 
+      # Parses a close tag. If the last tag on the stack is not the
+      # corresponding tag, this method will see if the previous tag can be auto
+      # closed. If it can be autoclosed it will automatically be popped off the
+      # stack (even without a close tag). Then it will look for the
+      # corresponding open tag. If an open tag is not found on the stack an
+      # error will be raised because it means we have a </div> close tag without a
+      # corresponding <div> open tag.
       def parse_close_tag
         start_token = match(:OPEN_CARET_FORWARD_SLASH) # "</"
 
         case @lexer.lookahead.type
         when :TAG_NAMESPACE
           namespace_token = match(:TAG_NAMESPACE)
-          name_token = match(:TAG_NAME)
+          name_token = match(:ELEMENT_NAME)
           type = :element
-        when :TAG_NAME
-          name_token = match(:TAG_NAME)
+        when :ELEMENT_NAME
+          name_token = match(:ELEMENT_NAME)
           type = :element
         when :VIEW_NAME
           name_token = match(:VIEW_NAME)
           type = :view
         else
-          error
+          error "Expected to see a tag name but instead got: #{@lexer.lookahead}"
         end
 
         finish_token = match(:CLOSE_CARET)
@@ -253,7 +293,7 @@ module Elements
         namespace_str = if namespace then namespace + ':' else ''; end
         close_tag = "</#{namespace_str}#{name}>"
 
-        # if the user is trying to close a void tag we're not going to find it
+        # If the user is trying to close a void tag we're not going to find it
         # on the stack. we could throw a parser error but i think this is a
         # silly part of the html spec and will be frustrating for users to have
         # to remember which tags they have to close vs which ones are
@@ -261,7 +301,7 @@ module Elements
         # saw this, shall we?
         return nil if void_tag?(name_token.value)
 
-        # if the last tag on the stack is an AST::Tag and it is not the tag
+        # If the last tag on the stack is an AST::Tag and it is not the tag
         # we're currently trying to close, see if we can autoclose it. if not
         # raise an error that we found an unclosed tag on the stack.
         if @stack.last.is_a?(AST::Tag) && @stack.last.name != name_token.value
@@ -292,6 +332,7 @@ module Elements
         ast_node
       end
 
+      # Parses a comment and adds it to the last template or tag on the stack.
       def parse_comment
         token = match(:COMMENT)
 
@@ -303,6 +344,7 @@ module Elements
         end
       end
 
+      # Parses text and adds it to the last template or tag on the stack.
       def parse_text
         token = match(:TEXT)
 
@@ -315,15 +357,14 @@ module Elements
       end
 
       def parse_attributes
-        [].tap do |attrs|
-          while @lexer.lookahead.type == :ATTRIBUTE_NAME
-            attrs << parse_attribute()
-          end
+        while @lexer.lookahead.type == :ATTRIBUTE_NAME
+          parse_attribute
         end
       end
 
       def parse_attribute
         name_token = match(:ATTRIBUTE_NAME)
+
         name_node = AST::AttributeName.new(
           name_token.value,
           with_default_options({location: name_token.location.dup})
@@ -353,13 +394,12 @@ module Elements
 
       def match(type, &block)
         token = @lexer.lookahead
-
         if token.type == type
           yield token if block_given?
           @lexer.scan
           return token
         else
-          error
+          error "Expected #{type} but got #{token.type}."
         end
       end
 
@@ -368,8 +408,7 @@ module Elements
       end
 
       def error(msg = nil, location = nil)
-        msg = msg || "Unexpected token: #{@lexer.lookahead} at #{@lexer.lookahead.location}."
-        raise SyntaxError.new(msg, location, @lexer.source)
+        raise ParseError.new(msg, location, @source)
       end
 
       class << self
@@ -383,7 +422,7 @@ module Elements
       end
     end
 
-    class SyntaxError < StandardError
+    class ParseError < StandardError
       def initialize(msg, location, source)
         super(msg)
         @location = location

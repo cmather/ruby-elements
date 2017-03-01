@@ -5,7 +5,7 @@ describe "Elements::Template::Parser" do
   describe "parse_attribute" do
     it "parses boolean attribute" do
       source = 'focused'
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal "focused", result.name.value, "wrong attribute name"
@@ -15,7 +15,7 @@ describe "Elements::Template::Parser" do
 
     it "parses single quoted attribute" do
       source = "class='my-class'"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal "class", result.name.value, "wrong attribute name"
@@ -24,7 +24,7 @@ describe "Elements::Template::Parser" do
 
     it "parses double quoted attribute" do
       source = 'class="my-class"'
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal "class", result.name.value, "wrong attribute name"
@@ -35,7 +35,7 @@ describe "Elements::Template::Parser" do
       name = "someprop"
       value = "my-class_name./+,?=:;#0123abcABC"
       source = "#{name}=#{value}"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal name, result.name.value, "wrong attribute name"
@@ -46,7 +46,7 @@ describe "Elements::Template::Parser" do
       name = "someprop"
       value = "#cccdef"
       source = "#{name}=#{value}"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal name, result.name.value, "wrong attribute name"
@@ -57,7 +57,7 @@ describe "Elements::Template::Parser" do
       name = "someprop"
       value = "100%"
       source = "#{name}=#{value}"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal name, result.name.value, "wrong attribute name"
@@ -68,7 +68,7 @@ describe "Elements::Template::Parser" do
       name = "someprop"
       value = "100%"
       source = "#{name}   \t =   \t '#{value}'"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
       result = parser.instance_eval { @lexer.scan; parse_attribute }
       assert_instance_of Elements::Template::AST::Attribute, result, "wrong ast type"
       assert_equal name, result.name.value, "wrong attribute name"
@@ -79,11 +79,11 @@ describe "Elements::Template::Parser" do
   describe "parse_attributes" do
     it "parses multiple attributes" do
       source = "name1='value1' name2 = \"value2\"   \t name3 = 100%  name4"
-      parser = Elements::Template::Parser.new(source, state: :attributes)
-      result = parser.instance_eval { @lexer.scan; parse_attributes }
-      assert_instance_of Array, result, "expected array"
+      parser = Elements::Template::Parser.new(source, state: :tag_attributes)
+      attributes = Elements::Template::AST::AttributeCollection.new(nil)
+      parser.instance_eval { @stack.push(attributes); @lexer.scan; parse_attributes }
       expected = [["name1", "value1"], ["name2", "value2"], ["name3", "100%"],["name4", nil]]
-      actual = result.map { |attr| [attr.name.value, attr.value && attr.value.value] }
+      actual = attributes.map { |attr| [attr.name.value, attr.value && attr.value.value] }
       assert_equal expected, actual, "wrong attributes"
     end
   end
@@ -254,7 +254,7 @@ describe "Elements::Template::Parser" do
       result = parser.instance_eval { @lexer.scan; parse_open_tag }
       assert_instance_of Elements::Template::AST::Element, result, "wrong tag ast node"
       assert_equal "div", result.name, "wrong tag name"
-      assert_equal 1, parser.stack_size, "wrong stack size"
+      assert_equal 1, parser.instance_eval { @stack.size }, "wrong stack size"
     end
 
     it "should parse namespace" do
@@ -264,7 +264,7 @@ describe "Elements::Template::Parser" do
       assert_instance_of Elements::Template::AST::Element, result, "wrong tag ast node"
       assert_equal "div", result.name, "wrong tag name"
       assert_equal "ns", result.namespace, "wrong tag namespace"
-      assert_equal 1, parser.stack_size, "wrong stack size"
+      assert_equal 1, parser.instance_eval { @stack.size }, "wrong stack size"
     end
 
     it "should parse view" do
@@ -273,7 +273,7 @@ describe "Elements::Template::Parser" do
       result = parser.instance_eval { @lexer.scan; parse_open_tag }
       assert_instance_of Elements::Template::AST::View, result, "wrong tag ast node"
       assert_equal "MyModule::MyView", result.name, "wrong tag name"
-      assert_equal 1, parser.stack_size, "wrong stack size"
+      assert_equal 1, parser.instance_eval { @stack.size }, "wrong stack size"
     end
 
     it "should autoclose tags when needed" do
@@ -291,7 +291,7 @@ describe "Elements::Template::Parser" do
       parser.stub :can_auto_close_tag?, can_auto_close_tag_stub do
         result = parser.instance_eval { @lexer.scan; parse_open_tag }
         assert result, "no parse result"
-        assert_equal 1, parser.stack_size, "prev tag not autoclosed and is still on stack"
+        assert_equal 1, parser.instance_eval { @stack.size }, "prev tag not autoclosed and is still on stack"
       end
     end
 
@@ -310,7 +310,7 @@ describe "Elements::Template::Parser" do
       parser.stub :can_auto_close_tag?, can_auto_close_tag_stub do
         result = parser.instance_eval { @lexer.scan; parse_open_tag }
         assert result, "no parse result"
-        assert_equal 2, parser.stack_size, "wrong parser stack size"
+        assert_equal 2, parser.instance_eval { @stack.size }, "wrong parser stack size"
         assert_equal ul_node, result.parent, "wrong parent"
         assert_equal result, ul_node.children.first, "wrong child"
       end
@@ -360,7 +360,7 @@ describe "Elements::Template::Parser" do
 
       parser.stub :void_tag?, void_tag_stub do
         parser.instance_eval { @lexer.scan; parse_open_tag }
-        assert_equal 0, parser.stack_size, "void element should not have been pushed onto parser stack"
+        assert_equal 0, parser.instance_eval { @stack.size }, "void element should not have been pushed onto parser stack"
       end
     end
 
@@ -378,7 +378,7 @@ describe "Elements::Template::Parser" do
 
       parser.stub :void_tag?, void_tag_stub do
         parser.instance_eval { @lexer.scan; parse_open_tag }
-        assert_equal 0, parser.stack_size, "self closing element should not have been pushed onto parser stack"
+        assert_equal 0, parser.instance_eval { @stack.size }, "self closing element should not have been pushed onto parser stack"
       end
     end
 
@@ -422,7 +422,7 @@ describe "Elements::Template::Parser" do
       parser.instance_eval { @stack.push(open_node) }
       result = parser.instance_eval { @lexer.scan; parse_close_tag }
       assert_equal open_node, result, "wrong ast node"
-      assert_equal 0, parser.stack_size, "open tag not popped from stack"
+      assert_equal 0, parser.instance_eval { @stack.size }, "open tag not popped from stack"
     end
 
     it "should parse a close element tag with namespace" do
@@ -432,7 +432,7 @@ describe "Elements::Template::Parser" do
       parser.instance_eval { @stack.push(open_node) }
       result = parser.instance_eval { @lexer.scan; parse_close_tag }
       assert_equal open_node, result, "wrong ast node"
-      assert_equal 0, parser.stack_size, "open tag not popped from stack"
+      assert_equal 0, parser.instance_eval { @stack.size }, "open tag not popped from stack"
     end
 
     it "should parse a close view tag" do
@@ -442,7 +442,7 @@ describe "Elements::Template::Parser" do
       parser.instance_eval { @stack.push(open_node) }
       result = parser.instance_eval { @lexer.scan; parse_close_tag }
       assert_equal open_node, result, "wrong ast node"
-      assert_equal 0, parser.stack_size, "open tag not popped from stack"
+      assert_equal 0, parser.instance_eval { @stack.size }, "open tag not popped from stack"
     end
 
     it "should autoclose previous tag if needed" do
@@ -460,7 +460,7 @@ describe "Elements::Template::Parser" do
       parser.stub :can_auto_close_tag?, can_auto_close_tag_stub do
         result = parser.instance_eval { @lexer.scan; parse_close_tag }
         assert_equal open_node, result, "wrong ast node"
-        assert_equal 0, parser.stack_size, "open tag and autoclose tag not popped from stack"
+        assert_equal 0, parser.instance_eval { @stack.size }, "open tag and autoclose tag not popped from stack"
       end
     end
 
@@ -468,7 +468,7 @@ describe "Elements::Template::Parser" do
       input = "</div>"
       parser = Elements::Template::Parser.new(input, state: :template)
 
-      assert_raises Elements::Template::SyntaxError do
+      assert_raises Elements::Template::ParseError do
         parser.instance_eval { @lexer.scan; parse_close_tag }
       end
     end
@@ -479,7 +479,7 @@ describe "Elements::Template::Parser" do
 
       # first get the open tag on the stack with the right position
       result = parser.instance_eval { @lexer.scan; parse_open_tag }
-      assert_equal 1, parser.stack_size, "open tag not on stack"
+      assert_equal 1, parser.instance_eval { @stack.size }, "open tag not on stack"
 
       # the initial location should just be the start <div> tag.
       assert_equal 0, result.location.start.index, "wrong start index"
@@ -565,12 +565,13 @@ describe "Elements::Template::Parser" do
   end
 
   describe "parse_template" do
-    it "should parse a template body" do
+    it "should parse an inline template body" do
       input = "<div></div>"
       parser = Elements::Template::Parser.new(input)
       result = parser.parse_template
       assert_instance_of Elements::Template::AST::Template, result, "wrong ast node"
       assert_equal 1, result.children.size, "template body should have one child"
+      assert result.inline?, "template node should be inline"
     end
   end
 
@@ -580,6 +581,7 @@ describe "Elements::Template::Parser" do
       parser = Elements::Template::Parser.new(input, state: :default)
       result = parser.instance_eval { @lexer.scan; parse_template_tag }
       assert_instance_of Elements::Template::AST::Template, result, "wrong ast node"
+      refute result.inline?, "template should not be inline"
     end
 
     it "should parse template attributes" do
@@ -597,6 +599,14 @@ describe "Elements::Template::Parser" do
       result = parser.instance_eval { @lexer.scan; parse_template_tag }
       assert_instance_of Elements::Template::AST::Template, result, "wrong ast node"
       assert_equal 2, result.children.size, "wrong children size"
+    end
+
+    it "should parse inline templates" do
+      input = "<template><template></template></template>"
+      parser = Elements::Template::Parser.new(input, state: :default)
+      result = parser.instance_eval { @lexer.scan; parse_template_tag }
+      assert_instance_of Elements::Template::AST::Template, result.first, "wrong ast node"
+      assert result.first.inline?, "inner template should be inline"
     end
   end
 

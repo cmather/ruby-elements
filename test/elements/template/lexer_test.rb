@@ -161,8 +161,6 @@ describe "Elements::Template::Lexer" do
     end
 
     it "EQUALS" do
-      # XXX this is an example where handling whitespace would be easier in the
-      # lexer! but maybe it's not too bad to do it in the parser. will see.
       assert_token(
         input: "=",
         type: :EQUALS,

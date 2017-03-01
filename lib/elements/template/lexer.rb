@@ -3,15 +3,6 @@ require "elements/template/location"
 
 module Elements
   module Template
-    module States
-      DEFAULT             = :default
-      TEMPLATE            = :template
-      TAG_NAME            = :tag_name
-      TAG_ATTRIBUTES      = :tag_attributes
-      TAG_ATTRIBUTE_VALUE = :tag_attribute_value
-      TAG_CLOSE           = :tag_close
-    end
-
     class Token
       attr_reader :type, :value, :location
       def initialize(type, value, location)
@@ -19,7 +10,7 @@ module Elements
       end
 
       def to_s
-        "'#{@value.to_s}'"
+        if @value == "\n" then "'\\n'" else "'#{@value}'"; end
       end
     end
 
@@ -109,6 +100,15 @@ module Elements
         end
       end
 
+      module States
+        DEFAULT             = :default
+        TEMPLATE            = :template
+        TAG_NAME            = :tag_name
+        TAG_ATTRIBUTES      = :tag_attributes
+        TAG_ATTRIBUTE_VALUE = :tag_attribute_value
+        TAG_CLOSE           = :tag_close
+      end
+
       state States::DEFAULT do
         match(Matchers::ANY)                                  { token(:ANY, @scanner.matched) }
         match(Matchers::TEMPLATE_OPEN)                        { push_state(States::TEMPLATE); push_state(States::TAG_ATTRIBUTES); token(:TEMPLATE_OPEN, @scanner.matched) }
@@ -116,7 +116,7 @@ module Elements
 
       state States::TEMPLATE do
         match(Matchers::COMMENT)                              { token(:COMMENT, @scanner[1]) }
-        match(Matchers::TEMPLATE_OPEN)                        { push_state(States::TEMPLATE); token(:TEMPLATE_OPEN, @scanner.matched) }
+        match(Matchers::TEMPLATE_OPEN)                        { push_state(States::TEMPLATE); push_state(States::TAG_ATTRIBUTES); token(:TEMPLATE_OPEN, @scanner.matched) }
         match(Matchers::TEMPLATE_CLOSE)                       { pop_state; token(:TEMPLATE_CLOSE, @scanner.matched) }
         match(Matchers::OPEN_CARET_FORWARD_SLASH)             { push_state(States::TAG_CLOSE); token(:OPEN_CARET_FORWARD_SLASH, @scanner.matched) }
         match(Matchers::OPEN_CARET)                           { push_state(States::TAG_NAME); token(:OPEN_CARET, @scanner.matched) }
@@ -160,7 +160,21 @@ module Elements
         @location_index = LocationIndex.new
         @lookahead = nil
         @states = []
-        @states << @options[:state] unless @options[:state].nil?
+
+        # If a start state is provided check that it's a valid state, and if it
+        # is, then push the state onto the state stack.
+        if @options[:state] && @options[:state] != States::DEFAULT
+          # Iterate over the States modules and get the values for all the
+          # states. See module States.
+          states = States.constants.map { |c| States.const_get(c) }
+
+          if states.include?(@options[:state])
+            # push the state onto the state stack.
+            @states << @options[:state]
+          else
+            raise "Unrecognized lexer state: #{@options[:state]}. Valid lexer states are: [#{states.join(', ')}]"
+          end
+        end
       end
 
       def state
@@ -175,17 +189,18 @@ module Elements
         @states.pop
       end
 
+      def eof?
+        @lookahead && @lookahead.type == :EOF
+      end
+
       def scan
+        skip_whitespace
+
         # if we're at the end of the input stream then return the end of file
         # (EOF) token.
         if @scanner.eos?
-          return Token.new(:EOF, nil, nil)
-        end
-
-        # if we encounter whitespace just return that to the parser so it can
-        # decide what to do.
-        if @scanner.scan(Matchers::SEA_WS)
-          return token(:SEA_WS, @scanner.matched)
+          @lookahead = Token.new(:EOF, nil, nil)
+          return @lookahead
         end
 
         # find the first rule that matches given our state and call the action
@@ -207,6 +222,12 @@ module Elements
       def token(type, value = nil)
         location = @location_index.advance(@scanner.matched)
         @lookahead = Token.new(type, value, location)
+      end
+
+      def skip_whitespace
+        while matched = @scanner.scan(Matchers::SEA_WS)
+          @location_index.advance(matched)
+        end
       end
 
       def rules
