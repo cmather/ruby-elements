@@ -151,6 +151,8 @@ module Elements
         match(Matchers::CLOSE_CARET)                          { pop_state; token(:CLOSE_CARET, @scanner.matched) }
       end
 
+      attr_reader :lookahead
+
       def initialize(io, **options)
         @options = options.dup
         @source = if io.respond_to?(:read) then io.read else io; end

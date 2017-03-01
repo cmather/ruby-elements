@@ -12,6 +12,7 @@ describe "Elements::Template::Lexer" do
     lexer = Elements::Template::Lexer.new(input, state: start_state == :default ? nil : start_state)
     token = lexer.scan
     assert token, "no token"
+    assert_equal token, lexer.lookahead, "lookahead not set to correct token"
     assert_equal type, token.type, "wrong token.type"
     assert_equal value, token.value, "wrong token.value"
     assert_equal finish_state, lexer.state, "wrong lexer finishing state"
