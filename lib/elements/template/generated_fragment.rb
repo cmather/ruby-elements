@@ -11,42 +11,98 @@ module Elements
       attr_reader :ast
       attr_reader :code
 
-      def initialize(ast, chunks = [], **options)
+      def initialize(generator, ast)
+        assert_type CodeGen, generator
         assert_type AST::Node, ast
-        assert_type_or_nil Array, chunks
-        @chunks = chunks
+        @chunks = []
         @ast = ast
-        @options = options
-        @indent = options[:indent] || ""
+        @generator = generator
       end
 
-      # Walks the fragment tree in order with the following algorithm: If a
-      # child is a string then call the block with the string and this ast node.
-      # If the fragment is instead another GeneratedFragment, descend into that
-      # tree by recursively calling the walk method and passing along the
-      # iterator block.
-      def each(&block)
-        @chunks.each do |chunk|
-          if GeneratedFragment === chunk
-            chunk.each(&block)
-          elsif String === chunk
-            yield chunk, @ast
+      # Generates a stack of modules and yields to the block indented to the
+      # inside of the inner most module.
+      def with_modules(modules, &block)
+        add_module = -> (idx = 0) {
+          if idx < modules.size
+            # put this newline at the top if this isn't the first module.
+            # putting it at the top instead of the at the bottom prevents adding
+            # a newline at the end of a module and leaves that responsibilit to
+            # the caller.
+            indent("module").write(" ").write(modules[idx])
+            newline
+            indent do
+              add_module.call(idx + 1)
+            end
+            newline
+            indent("end")
+          else
+            yield
           end
-        end
+        }
+
+        add_module.call()
+        self
       end
 
-      # Write one or more chunks to this fragment.
-      def write(*chunks)
-        chunks.each { |chunk| @chunks << chunk }
+      # Generates a class and yields to the block which can add things to the
+      # class before the class is ended.
+      def with_class(class_name, **options, &block)
+        indent("class").write(" ").write(class_name)
+        write(" < ").write(options[:superclass]) unless options[:superclass].nil?
+        newline
+        indent do
+          yield
+        end
+        newline
+        indent("end")
         self
       end
 
       # Write an indent followed by one or more chunks to this fragment.
-      def indent(*chunks)
-        @chunks << @indent
-        write(chunks)
+      def indent(*chunks, &block)
+        if chunks.size > 0
+          write @generator.indent
+          write(*chunks)
+          self
+        else
+          begin
+            saved = @generator.indent
+            @generator.indent += @generator.options[:indent]
+            yield
+            self
+          ensure
+            @generator.indent = saved
+          end
+        end
+      end
+
+      # Add a newline chunk.
+      def newline
+        write("\n")
+      end
+
+      # Add a quoted string.
+      def quoted_string(str)
+        write("\"#{str}\"")
+      end
+
+
+      # Write one or more chunks to this fragment.
+      def write(*chunks, &block)
+        if block_given?
+          result = yield
+          chunks += result.is_a?(Array) ? result : [result]
+        end
+
+        chunks.each do |chunk|
+          assert_in_types [String, GeneratedFragment], chunk
+          @chunks << chunk
+        end
+
         self
       end
+
+      alias_method :<<, :write
 
       def to_code_with_sourcemap
         mappings = []
@@ -81,7 +137,26 @@ module Elements
       end
 
       def to_code
-        reduce("") { |code, chunk| code << chunk }
+        reduce("") do |code, args|
+          # the first arg is the chunk and the second arg is the ast node. see
+          # this class' implementation of 'each'.
+          code << args[0]
+        end
+      end
+
+      # Walks the fragment tree in order with the following algorithm: If a
+      # child is a string then call the block with the string and this ast node.
+      # If the fragment is instead another GeneratedFragment, descend into that
+      # tree by recursively calling the walk method and passing along the
+      # iterator block.
+      def each(&block)
+        @chunks.each do |chunk|
+          if GeneratedFragment === chunk
+            chunk.each(&block)
+          elsif String === chunk
+            yield chunk, @ast
+          end
+        end
       end
     end
   end
