@@ -1,5 +1,6 @@
 require "elements/assertions"
 require "elements/template/parser"
+require "elements/template/code_gen"
 
 module Elements
   module Template
