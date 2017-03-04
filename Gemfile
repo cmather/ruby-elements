@@ -12,4 +12,7 @@ gem "colorize",           "~> 0.8"
 gem "minitest",           "~> 5.0"
 gem "minitest-reporters", "~> 1.0"
 gem "sourcemap",          "~> 0.1.1"
-gem "activesupport",      "~> 5.0.0"
+
+group :test do
+  gem "activesupport",      "~> 5.0.0"
+end

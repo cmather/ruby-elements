@@ -1,9 +1,12 @@
 require "elements/template/ast/tag"
+require "elements/utils"
 
 module Elements
   module Template
     module AST
       class Template < Tag
+        include Utils
+
         def initialize(options = {})
           # The @name attribute will be "Template".
           super("Template", options)
@@ -27,7 +30,7 @@ module Elements
               modules = @attributes["name"].split("::")
               class_name = modules.pop
             elsif @filepath != nil
-              modules = File.dirname(@filepath).split(File::SEPARATOR).map(&:camelize)
+              modules = File.dirname(@filepath).split(File::SEPARATOR).map { |s| camelize(s) }
               class_name = "Template"
             else
               raise "Missing template name. Either set the name attribute or the filepath on the ast node."
