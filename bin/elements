@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+gem_path = File.expand_path("../../lib", __FILE__)
+$LOAD_PATH.unshift(gem_path) unless $LOAD_PATH.include?(gem_path)
+
+require "bundler/setup"
+require "elements/template/compiler"
+require "benchmark"
+require "colorize"
+
+time = Benchmark.realtime do
+  $source = $stdin.read
+  $compiler = Elements::Template::Compiler.new(filepath: "views/home/home.html")
+  $result = $compiler.compile($source)
+  $stdout.write $result
+end
+$stderr.puts "Compiled in #{time.round(4)} seconds.".colorize(:green)
