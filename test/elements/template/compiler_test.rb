@@ -26,6 +26,7 @@ describe "Elements::Template::Compiler" do
 
     expected = <<-EOF.strip_heredoc
     require "elements/template"
+
     require "some/lib"
 
     module Views
@@ -77,6 +78,7 @@ describe "Elements::Template::Compiler" do
 
     expected = <<-EOF.strip_heredoc
     require "elements/template"
+
     class MyTemplate < Elements::Template::Base
       def default_options
         {
@@ -104,6 +106,7 @@ describe "Elements::Template::Compiler" do
 
     expected = <<-EOF.strip_heredoc
     require "elements/template"
+
     module Views
       module Home
         class Template < Elements::Template::Base
@@ -137,6 +140,7 @@ describe "Elements::Template::Compiler" do
 
     expected = <<-EOF.strip_heredoc
     require "elements/template"
+
     module Views
       module Home
         class Template < Elements::Template::Base

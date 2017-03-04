@@ -38,6 +38,7 @@ module Elements
           codegen.fragment(self) do |f|
             f.indent("require ").quoted_string("elements/template")
             f.newline
+            f.newline
 
             @children.each_with_index do |child_ast, idx|
               f.write child_ast.generate(codegen)

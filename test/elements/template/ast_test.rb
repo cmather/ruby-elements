@@ -138,6 +138,7 @@ describe "Elements::Template::AST" do
 
       expected = <<-EOF.strip_heredoc
       require "elements/template"
+
       require 'some/path/to/victory'
 
       class MyTemplate < Elements::Template::Base
