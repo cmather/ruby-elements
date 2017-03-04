@@ -64,6 +64,8 @@ module Elements
           return to_enum(:preorder) unless block_given?
           @children.each { |node| node.preorder(&block) }
         end
+
+        alias_method :traverse, :preorder
       end
     end
   end

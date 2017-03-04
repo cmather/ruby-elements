@@ -148,7 +148,8 @@ describe "Elements::Template::Parser" do
       parser.instance_eval { @stack.push(template_node) }
       result = parser.instance_eval { @lexer.scan; parse_comment }
       assert result, "no comment ast node"
-      assert_equal template_node, result.parent
+      assert result.parent, "result has no parent"
+      assert_equal template_node, result.parent, "wrong parent"
       assert_equal template_node.children[0], result, "comment not added as child to template"
     end
 

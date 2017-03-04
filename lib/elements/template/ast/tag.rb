@@ -48,6 +48,46 @@ module Elements
           @attributes.preorder(&block)
           @children.preorder(&block)
         end
+
+        def generate(codegen = Elements::Template::CodeGen.new)
+          codegen.fragment(self) do |f|
+            f.indent(@name).write(".new({")
+            f.newline
+            f.indent do
+              generate_attributes(codegen, f)
+            end
+            f.newline
+            f.indent "}, ["
+            f.newline
+            f.indent do
+              generate_children(codegen, f)
+            end
+            f.newline
+            f.indent "])"
+          end
+        end
+
+        private
+        def generate_attributes(codegen, fragment)
+          @attributes.each_with_index do |child_ast, idx|
+            if idx > 0
+              fragment.write ","
+              fragment.newline
+            end
+
+            fragment.write child_ast.generate(codegen)
+          end
+        end
+
+        def generate_children(codegen, fragment)
+          @children.each_with_index do |child_ast, idx|
+            if idx > 0
+              fragment.write ","
+              fragment.newline
+            end
+            fragment.write child_ast.generate(codegen)
+          end
+        end
       end
     end
   end

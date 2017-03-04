@@ -33,6 +33,15 @@ module Elements
         def to_s
           @children.map(&:to_s).join
         end
+
+        def generate(codegen = Elements::Template::CodeGen.new)
+          codegen.fragment(self) do |f|
+            @children.each_with_index do |child_ast, idx|
+              f.newline if idx > 0
+              f.write child_ast.generate(codegen)
+            end
+          end
+        end
       end
     end
   end

@@ -22,6 +22,12 @@ module Elements
           return to_enum(:preorder) unless block_given?
           yield self
         end
+
+        def generate(codegen = Elements::Template::CodeGen.new)
+          codegen.fragment(self) do |f|
+            f.indent @value
+          end
+        end
       end
     end
   end

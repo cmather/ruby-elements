@@ -28,6 +28,12 @@ module Elements
           @name.preorder(&block)
           @value.preorder(&block)
         end
+
+        def generate(codegen = Elements::Template::CodeGen.new)
+          codegen.fragment(self) do |f|
+            f.indent(@name.generate(codegen)).write(" => ").write(@value.generate(codegen))
+          end
+        end
       end
     end
   end

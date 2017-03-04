@@ -15,8 +15,14 @@ module Elements
 
         def add(node)
           assert_type Attribute, node
+
           super(node)
-          @attrs[node.name.value.to_s] = node.value.value
+
+          if node.boolean?
+            @attrs[node.name.value.to_s] = true
+          else
+            @attrs[node.name.value.to_s] = node.value.value
+          end
         end
 
         alias_method :<<, :add

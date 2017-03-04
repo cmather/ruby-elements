@@ -13,17 +13,12 @@ module Elements
         attr_accessor :next_sibling
         attr_accessor :parent
 
-        def initialize(options = {})
+        def initialize(**options)
           @filepath = options[:filepath]
           @source = options[:source]
           @location = options[:location] || Location.new
           @prev_sibling = nil
           @next_sibling = nil
-          @parent = nil
-        end
-
-        def <<(node)
-          raise NotImplementedError
         end
 
         # Preorder traversal of the abstract syntax tree.
@@ -33,6 +28,10 @@ module Elements
         end
 
         alias_method :traverse, :preorder
+
+        def <<(node); raise NotImplementedError end
+
+        def generate(codegen); raise NotImplementedError; end
       end
     end
   end

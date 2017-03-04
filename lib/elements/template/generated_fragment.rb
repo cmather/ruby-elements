@@ -24,10 +24,6 @@ module Elements
       def with_modules(modules, &block)
         add_module = -> (idx = 0) {
           if idx < modules.size
-            # put this newline at the top if this isn't the first module.
-            # putting it at the top instead of the at the bottom prevents adding
-            # a newline at the end of a module and leaves that responsibilit to
-            # the caller.
             indent("module").write(" ").write(modules[idx])
             newline
             indent do
@@ -94,7 +90,10 @@ module Elements
           chunks += result.is_a?(Array) ? result : [result]
         end
 
-        chunks.each do |chunk|
+        # just in case there's an array value on the chunks array (like when you
+        # call generate on a NodeCollection) flatten the results into a single
+        # array of strings and generated fragments.
+        chunks.flatten.each do |chunk|
           assert_in_types [String, GeneratedFragment], chunk
           @chunks << chunk
         end
