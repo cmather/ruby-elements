@@ -135,12 +135,12 @@ module Elements
         [code, sourcemap]
       end
 
+      def to_sourcemap
+        to_code_with_sourcemap.last
+      end
+
       def to_code
-        reduce("") do |code, args|
-          # the first arg is the chunk and the second arg is the ast node. see
-          # this class' implementation of 'each'.
-          code << args[0]
-        end
+        to_code_with_sourcemap.first
       end
 
       # Walks the fragment tree in order with the following algorithm: If a

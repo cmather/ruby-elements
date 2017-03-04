@@ -52,18 +52,28 @@ module Elements
         def generate(codegen = Elements::Template::CodeGen.new)
           codegen.fragment(self) do |f|
             f.indent(@name).write(".new({")
-            f.newline
-            f.indent do
-              generate_attributes(codegen, f)
+
+            if @attributes.empty?
+              f.write "}, ["
+            else
+              f.newline
+              f.indent do
+                generate_attributes(codegen, f)
+              end
+              f.newline
+              f.indent "}, ["
             end
-            f.newline
-            f.indent "}, ["
-            f.newline
-            f.indent do
-              generate_children(codegen, f)
+
+            if @children.empty?
+              f.write "])"
+            else
+              f.newline
+              f.indent do
+                generate_children(codegen, f)
+              end
+              f.newline
+              f.indent "])"
             end
-            f.newline
-            f.indent "])"
           end
         end
 

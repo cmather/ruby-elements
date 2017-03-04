@@ -131,13 +131,15 @@ describe "Elements::Template::AST" do
 
     it "generates code" do
       ast = document([
-        any("require 'some/path/to/victory'\n"),
+        any("require 'some/path/to/victory'\n\n"),
         template({name: "MyTemplate"}, [text("hello world")]),
-        any("footer")
+        any("\nfooter")
       ])
 
       expected = <<-EOF.strip_heredoc
-      require 'some/path/to/victory'\n
+      require "elements/template"
+      require 'some/path/to/victory'
+
       class MyTemplate < Elements::Template::Base
         def default_options
           {

@@ -27,9 +27,8 @@ module Elements
               modules = @attributes["name"].split("::")
               class_name = modules.pop
             elsif @filepath != nil
-              # Otherwise use the filepath as the module names and class name.
-              modules = @filepath.split(File::SEPARATOR)
-              class_name = modules.pop
+              modules = File.dirname(@filepath).split(File::SEPARATOR).map(&:camelize)
+              class_name = "Template"
             else
               raise "Missing template name. Either set the name attribute or the filepath on the ast node."
             end
@@ -40,13 +39,19 @@ module Elements
                 f.newline
                 f.indent do
                   f.indent "{"
-                  f.newline
-                  f.indent do
-                    generate_attributes(codegen, f)
+
+                  if @attributes.empty?
+                    f.write "}"
+                  else
+                    f.newline
+                    f.indent do
+                      generate_attributes(codegen, f)
+                    end
+                    f.newline
+                    f.indent "}"
                   end
-                  f.newline
-                  f.indent "}"
                 end
+
                 f.newline
                 f.indent "end"
 
@@ -57,13 +62,19 @@ module Elements
                 f.newline
                 f.indent do
                   f.indent "["
-                  f.newline
-                  f.indent do
-                    generate_children(codegen, f)
+
+                  if @children.empty?
+                    f.write "]"
+                  else
+                    f.newline
+                    f.indent do
+                      generate_children(codegen, f)
+                    end
+                    f.newline
+                    f.indent "]"
                   end
-                  f.newline
-                  f.indent "]"
                 end
+
                 f.newline
                 f.indent "end"
               end
