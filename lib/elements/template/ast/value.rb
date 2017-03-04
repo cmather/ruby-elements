@@ -9,7 +9,7 @@ module Elements
 
         def initialize(value, options = {})
           super(options)
-          @value = value
+          @value = value.to_s
         end
 
         def to_s
