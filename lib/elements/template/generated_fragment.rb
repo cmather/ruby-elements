@@ -79,6 +79,7 @@ module Elements
 
       # Add a quoted string.
       def quoted_string(str)
+        str = str.gsub("\n", "\\n").gsub("\r", "\\r")
         write("\"#{str}\"")
       end
 

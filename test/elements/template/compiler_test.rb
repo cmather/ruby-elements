@@ -66,4 +66,98 @@ describe "Elements::Template::Compiler" do
     compiled = compile(source.strip, filepath: "views/home/home.html")
     assert_equal expected.strip, compiled, "wrong compiled code"
   end
+
+  it "newlines in textnodes" do
+    source = <<-EOF.strip_heredoc
+    <template name="MyTemplate">
+      hello
+      world
+    </template>
+    EOF
+
+    expected = <<-EOF.strip_heredoc
+    require "elements/template"
+    class MyTemplate < Elements::Template::Base
+      def default_options
+        {
+          "name" => "MyTemplate"
+        }
+      end
+
+      def children
+        [
+          vtext("hello\\n  world\\n")
+        ]
+      end
+    end
+    EOF
+
+    compiled = compile(source.strip)
+    assert_equal expected.strip, compiled, "wrong compiled code"
+  end
+
+  it "template with name" do
+    source = <<-EOF.strip_heredoc
+    <template name="Views::Home::Template">
+    </template>
+    EOF
+
+    expected = <<-EOF.strip_heredoc
+    require "elements/template"
+    module Views
+      module Home
+        class Template < Elements::Template::Base
+          def default_options
+            {
+              "name" => "Views::Home::Template"
+            }
+          end
+
+          def children
+            []
+          end
+        end
+      end
+    end
+    EOF
+
+    compiled = compile(source.strip)
+    assert_equal expected.strip, compiled, "wrong compiled code"
+  end
+
+  it "inline templates" do
+    source = <<-EOF.strip_heredoc
+    <template name="Views::Home::Template">
+      <template>
+      </template>
+      <template>
+      </template>
+    </template>
+    EOF
+
+    expected = <<-EOF.strip_heredoc
+    require "elements/template"
+    module Views
+      module Home
+        class Template < Elements::Template::Base
+          def default_options
+            {
+              "name" => "Views::Home::Template"
+            }
+          end
+
+          def children
+            [
+              Template.new({}, []),
+              Template.new({}, [])
+            ]
+          end
+        end
+      end
+    end
+    EOF
+
+    compiled = compile(source.strip)
+    assert_equal expected.strip, compiled, "wrong compiled code"
+  end
 end
