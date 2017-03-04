@@ -36,8 +36,10 @@ module Elements
 
         def generate(codegen = Elements::Template::CodeGen.new)
           codegen.fragment(self) do |f|
+            f.indent("require ").quoted_string("elements/template")
+            f.newline
+
             @children.each_with_index do |child_ast, idx|
-              f.newline if idx > 0
               f.write child_ast.generate(codegen)
             end
           end
