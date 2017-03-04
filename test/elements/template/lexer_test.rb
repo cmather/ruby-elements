@@ -72,7 +72,7 @@ describe "Elements::Template::Lexer" do
         input: "<template",
         type: :TEMPLATE_OPEN,
         start_state: :template,
-        finish_state: :template
+        finish_state: :tag_attributes
       )
     end
 
