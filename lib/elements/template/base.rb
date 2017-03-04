@@ -1,6 +1,10 @@
+require "elements/vdom"
+
 module Elements
   module Template
     class Base
+      include Elements::VDOM::Helpers
+
       def initialize(attributes = {}, children = [])
         @attributes = attributes
         @children = children

@@ -1,9 +1,6 @@
 require "elements/assertions"
 require "elements/template/parser"
 
-# XXX remember to require the right files at the top, like the vdom stuff and
-# the template and view.
-
 module Elements
   module Template
     class Compiler
@@ -13,19 +10,23 @@ module Elements
       attr_reader :sourcemap
       attr_reader :filename
 
-      def initialize(io, options = {})
-        assert_type Hash, options
-        @parser = Parser.new(io, options)
+      def initialize(**options)
         @options = options
-        @sourcemap = nil
-        @comments = []
-        @result = nil
       end
 
-      def compile
-        ast = @parser.parse
-        @result = ast.compile
-        @result
+      def compile(io)
+        # FIXME change api of parser to pass io to parse method
+        ast_node = Parser.new(io, @options).parse
+        codegen = CodeGen.new(@options)
+        @fragment = codegen.generate(ast_node)
+        @code, @sourcemap = @fragment.to_code_with_sourcemap
+        @code
+      end
+
+      class << self
+        def compile(io, **options)
+          new(options).compile(io)
+        end
       end
     end
   end
