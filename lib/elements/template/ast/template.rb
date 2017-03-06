@@ -1,11 +1,11 @@
 require "elements/template/ast/tag"
-require "elements/utils"
+require "elements/core/utils"
 
 module Elements
   module Template
     module AST
       class Template < Tag
-        include Utils
+        include Core::Utils
 
         def initialize(options = {})
           # The @name attribute will be "Template".

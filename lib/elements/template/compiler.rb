@@ -1,11 +1,11 @@
-require "elements/assertions"
+require "elements/core/assertions"
 require "elements/template/parser"
 require "elements/template/code_gen"
 
 module Elements
   module Template
     class Compiler
-      include Assertions
+      include Core::Assertions
 
       attr_reader :code
       attr_reader :sourcemap

@@ -6,7 +6,7 @@ module Elements
   module Template
     class GeneratedFragment
       include Enumerable
-      include Assertions
+      include Core::Assertions
 
       attr_reader :ast
       attr_reader :code

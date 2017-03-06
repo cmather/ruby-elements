@@ -1,4 +1,4 @@
-require "elements/assertions"
+require "elements/core/assertions"
 require "elements/template/location"
 
 module Elements

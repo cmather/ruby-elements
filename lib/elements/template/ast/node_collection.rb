@@ -1,4 +1,4 @@
-require "elements/assertions"
+require "elements/core/assertions"
 require "elements/template/ast/node"
 
 module Elements
@@ -6,7 +6,7 @@ module Elements
     module AST
       class NodeCollection
         include Enumerable
-        include Assertions
+        include Core::Assertions
 
         attr_reader :parent
         attr_reader :children

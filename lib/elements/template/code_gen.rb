@@ -1,10 +1,10 @@
-require "elements/assertions"
+require "elements/core/assertions"
 require "elements/template/generated_fragment"
 
 module Elements
   module Template
     class CodeGen
-      include  Assertions
+      include  Core::Assertions
 
       attr_reader :result
       attr_reader :options

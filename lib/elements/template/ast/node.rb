@@ -1,11 +1,11 @@
-require "elements/assertions"
+require "elements/core/assertions"
 require "elements/template/location"
 
 module Elements
   module Template
     module AST
       class Node
-        include Assertions
+        include Core::Assertions
 
         attr_reader :filepath
         attr_reader :location

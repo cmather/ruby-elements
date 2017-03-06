@@ -5,9 +5,8 @@ require "bundler/setup"
 require "byebug"
 require "minitest/autorun"
 require "minitest/reporters"
-require "elements/template/parser"
-require "elements/template/code_gen"
 require "active_support/core_ext/string"
+require "elements/core"
 
 Minitest::Reporters.use!([Minitest::Reporters::SpecReporter.new])
 
@@ -23,6 +22,25 @@ module Minitest
 
     def codegen(ast, opts = {})
       Elements::Template::CodeGen.generate(ast, opts)
+    end
+
+    def with_log(target, method, &callback)
+      log = []
+      orig = target.instance_method(method)
+      target.class_eval do
+        define_method(method) do |*args|
+          log << { self: self, args: args }
+          orig.bind(self).call(*args)
+        end
+      end
+
+      yield log
+    ensure
+      target.class_eval { define_method(method, orig) }
+    end
+
+    def with_event_log(&callback)
+      with_log(Elements::Core::Events::InstanceMethods, :trigger, &callback)
     end
   end
 end
