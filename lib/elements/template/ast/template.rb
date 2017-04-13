@@ -61,6 +61,21 @@ module Elements
                 f.newline
                 f.newline
 
+                # XXX instead of this should it be call(view) which takes a
+                # view? could also provide a class method on Template that
+                # instantiates a new template like new(opts).call(view). One of
+                # the benefits of this approach is that we can assume a variable
+                # will be in scope in this method. the "view" which can be
+                # passed to a child constructor without actually evaluating it.
+                # What about callable things? Should those things be called with
+                # a view. oh wait, this is indicating that these methods would
+                # be executed as soon as this method is called, vs. in the
+                # rendering phase. that would indeed change things
+                # substantially. because we would know at the top level what the
+                # vnodes will be. no this won't work. it's possible you'd have
+                # procs nested very deeply, right? no they'll all be defined in
+                # top level scope. look at an example to see. draw out the tag
+                # tree.
                 f.indent "def children"
                 f.newline
                 f.indent do

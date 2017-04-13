@@ -1,3 +1,4 @@
+# XXX add a grammar at the top of this file as a reference and sanity check.
 require "elements/template/lexer"
 require "elements/template/ast"
 require "elements/template/tag_helpers"
